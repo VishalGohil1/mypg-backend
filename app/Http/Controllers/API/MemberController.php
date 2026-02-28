@@ -4,9 +4,11 @@ namespace App\Http\Controllers\API;
 
 use App\Http\Controllers\Controller;
 use App\Models\Member;
+use App\Models\PGGroupUser;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use App\Imports\MembersImport;
+use Illuminate\Support\Facades\Auth;
 use Maatwebsite\Excel\Facades\Excel;
 
 
@@ -17,7 +19,17 @@ class MemberController extends Controller
      */
     public function index(Request $request)
     {
-        $pgGroupId = $request->user()->pg_group_id;
+        $user = Auth::user();        
+        // Get PG group from mapping table
+        $groupUser = PGGroupUser::where('user_id', $user->id)->first();
+
+        if (!$groupUser) {
+            return response()->json([
+                'message' => 'User not linked to any PG group'
+            ], 403);
+        }
+
+        $pgGroupId = $groupUser->pg_group_id;
 
         $members = Member::where('pg_group_id', $pgGroupId)
             ->orderBy('created_at', 'desc')

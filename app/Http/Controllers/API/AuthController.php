@@ -60,12 +60,17 @@ class AuthController extends Controller
 
         // create new token
         $token = $user->createToken('MyPGToken')->plainTextToken;
-
+        $role = DB::table('pg_group_users')
+                ->where('user_id', $user->id)
+                ->where('pg_group_id', $user->pg_group_id)
+                ->value('role');
+        $user->role = $role; // Attach role manually
         return response()->json([
             'status' => true,
             'message' => 'Login successful',
             'token' => $token,
             'user' => $user
+            
         ]);
     }
     public function register(Request $request)

@@ -5,6 +5,8 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\API\AuthController;
 use App\Http\Controllers\API\MemberController;
 use App\Http\Controllers\API\PaymentController;
+use App\Http\Controllers\API\DashboardController;
+use App\Http\Controllers\API\PartnerController;
 
 /*
 |--------------------------------------------------------------------------
@@ -28,12 +30,16 @@ Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
 Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('/members', [MemberController::class, 'index']);
+    Route::get('/partners', [PartnerController::class, 'index']);
 
     Route::post('/members', [MemberController::class, 'store']);
 
     Route::post('/members/import', [MemberController::class, 'import']);
     
     Route::get('/members/sample', [MemberController::class, 'downloadSample']);
+
+    Route::get('/dashboard', [DashboardController::class, 'index']);
+    Route::post('/add-partner', [PartnerController::class, 'store']);
     
 });
 Route::post('/create-order', [PaymentController::class, 'createOrder']);
