@@ -106,4 +106,56 @@ class PartnerController extends Controller
             ], 500);
         }
     }
+    public function destroy($id)
+    {
+        $authUser = auth()->user();
+
+        // Get logged-in user's group mapping
+        $groupUser = PGGroupUser::where('user_id', $authUser->id)->first();
+
+        if (!$groupUser || $groupUser->role !== 'owner') {
+            return response()->json([
+                'message' => 'Only owner can delete partners'
+            ], 403);
+        }
+
+        // Prevent deleting self
+        if ($authUser->id == $id) {
+            return response()->json([
+                'message' => 'You cannot delete yourself'
+            ], 400);
+        }
+
+        // Check if target user exists
+        $partner = User::find($id);
+
+        if (!$partner) {
+            return response()->json([
+                'message' => 'User not found'
+            ], 404);
+        }
+
+        // Check if target user is partner in same group
+        $partnerMapping = PGGroupUser::where('user_id', $id)
+            ->where('pg_group_id', $groupUser->pg_group_id)
+            ->where('role', 'partner')
+            ->first();
+
+        if (!$partnerMapping) {
+            return response()->json([
+                'message' => 'This user is not your partner'
+            ], 403);
+        }
+
+        // Delete mapping first
+        $partnerMapping->delete();
+
+        // Delete user
+        $partner->delete();
+
+        return response()->json([
+            'status' => true,
+            'message' => 'Partner deleted successfully'
+        ]);
+    }
 }

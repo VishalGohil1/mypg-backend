@@ -40,6 +40,10 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('/dashboard', [DashboardController::class, 'index']);
     Route::post('/add-partner', [PartnerController::class, 'store']);
+    Route::delete('/partners/{id}', [PartnerController::class, 'destroy']);
+    Route::delete('/members/{id}', [MemberController::class, 'destroy']);
+
+    Route::post('/members/{member}/collect-payment', [MemberController::class, 'collectPayment']);
     
 });
 Route::post('/create-order', [PaymentController::class, 'createOrder']);
