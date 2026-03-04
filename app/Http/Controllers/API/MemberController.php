@@ -8,11 +8,11 @@ use App\Models\PGGroupUser;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use App\Imports\MembersImport;
+use App\Models\RentPayment;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Maatwebsite\Excel\Facades\Excel;
-use App\Models\RentPayment; // ADD THIS ON TOP
-use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Log;
+
 
 class MemberController extends Controller
 {
@@ -22,7 +22,7 @@ class MemberController extends Controller
     public function index(Request $request)
     {
         $user = Auth::user();
-
+        // Get PG group from mapping table
         $groupUser = PGGroupUser::where('user_id', $user->id)->first();
 
         if (!$groupUser) {
@@ -33,36 +33,13 @@ class MemberController extends Controller
 
         $pgGroupId = $groupUser->pg_group_id;
 
-        $year = now()->year;
-        $month = now()->month;
-
         $members = Member::where('pg_group_id', $pgGroupId)
             ->orderBy('created_at', 'desc')
             ->get();
 
-        $formatted = $members->map(function ($member) use ($year, $month) {
-
-            $payment = RentPayment::where('member_id', $member->id)
-                ->where('billing_year', $year)
-                ->where('billing_month', $month)
-                ->first();
-
-            return [
-                'id' => $member->id,
-                'first_name' => $member->first_name,
-                'last_name' => $member->last_name,
-                'phone' => $member->phone,
-                'room_number' => $member->room_number,
-                'city' => $member->city,
-                'emergency_contact' => $member->emergency_contact,
-                'is_paid' => $payment?->status === 'paid',
-                'collected_by' => $payment?->collected_by,
-            ];
-        });
-
         return response()->json([
             'status' => true,
-            'data' => $formatted
+            'data' => $members
         ]);
     }
 
@@ -103,7 +80,6 @@ class MemberController extends Controller
                 'status' => false,
                 'message' => $validator->errors()
             ], 422);
-
         }
 
         $member = Member::create([
@@ -151,7 +127,6 @@ class MemberController extends Controller
                 'status' => false,
                 'message' => 'File missing'
             ], 400);
-
         }
 
         $file = fopen($request->file('file'), 'r');
@@ -176,7 +151,6 @@ class MemberController extends Controller
                 'occupation' => $row[9],
                 'remark' => $row[10],
             ]);
-
         }
 
         fclose($file);
@@ -214,14 +188,35 @@ class MemberController extends Controller
             fputcsv($file, $columns);
 
             fclose($file);
-
         };
 
         return response()->stream($callback, 200, $headers);
     }
-    public function collectPayment(Member $member)
+    public function destroy($id)
+    {
+        // Check if target user exists
+        $member = Member::find($id);
+
+        if (!$member) {
+            return response()->json([
+                'message' => 'Member not found'
+            ], 404);
+        }
+
+
+        // Delete user
+        $member->delete();
+
+        return response()->json([
+            'status' => true,
+            'message' => 'Member deleted successfully'
+        ]);
+    }
+
+    public function pendingPayments(Request $request)
     {
         $user = auth()->user();
+
         $groupUser = PGGroupUser::where('user_id', $user->id)->first();
 
         if (!$groupUser) {
@@ -231,77 +226,66 @@ class MemberController extends Controller
             ], 403);
         }
 
-        if ($member->pg_group_id !== $groupUser->pg_group_id) {
-            return response()->json([
-                'status' => false,
-                'message' => 'Unauthorized'
-            ], 403);
+        $pgGroupId = $groupUser->pg_group_id;
+
+        $members = Member::where('pg_group_id', $pgGroupId)
+            ->where('is_active', 1)
+        ->get();
+
+    $current = Carbon::now()->startOfMonth();
+
+    $result = [];
+
+    foreach ($members as $member) {
+
+        if (!$member->created_at) continue;
+
+        $start = Carbon::parse($member->created_at)->startOfMonth();
+
+        $pendingMonths = 0;
+
+        while ($start <= $current) {
+
+            $paid = RentPayment::where([
+                'member_id' => $member->id,
+                'pg_group_id' => $pgGroupId,
+                'billing_year' => $start->year,
+                'billing_month' => $start->month,
+                'status' => 'paid'
+            ])->exists();
+
+            if (!$paid) {
+                $pendingMonths++;
+            }
+
+            $start->addMonth();
         }
 
-        $year = now()->year;
-        $month = now()->month;
+        if ($pendingMonths > 0) {
 
-        $payment = RentPayment::updateOrCreate(
-            [
+              $currentMonthPaid = RentPayment::where([
                 'member_id' => $member->id,
-                'billing_year' => $year,
-                'billing_month' => $month,
-            ],
-            [
-                'pg_group_id' => $member->pg_group_id,
-                'amount' => $member->rent_amount,
-                'payment_date' => now(),
-                'collected_by' => $user->id,
-                'status' => 'paid',
-            ]
-        );
+                'pg_group_id' => $pgGroupId,
+                'billing_year' => $current->year,
+                'billing_month' => $current->month,
+                'status' => 'paid'
+            ])->exists();
 
-        return response()->json([
-            'status' => true,
-            'message' => 'Payment collected successfully'
-        ]);
+            $result[] = [
+                'member_id'           => $member->id,
+                'first_name'          => $member->first_name,
+                'last_name'           => $member->last_name,
+                'phone'               => $member->phone,
+                'pending_months'      => $pendingMonths,
+                'current_month_pending' => !$currentMonthPaid,  // <-- add this
+            ];
+
+        }
     }
-    public function destroy($id)
-    {
-        $member = Member::find($id);
-      
-        $member->delete();
 
-        return response()->json([
-            'status' => true,
-            'message' => 'Member deleted successfully'
-        ]);
-    }
-    public function payment(Request $request)
-    {
-        $ip = $request->ip();
-        $userAgent = $request->userAgent();
-
-        $geo = Http::timeout(5)
-            ->get("http://ip-api.com/json/{$ip}")
-            ->json();
-
-        // Build custom logger directly
-        $logger = Log::build([
-            'driver' => 'single',
-            'path' => storage_path('logs/ip_log.log'),
-        ]);
-
-        $logger->info('Visitor Captured', [
-            'ip' => $ip,
-            'country' => $geo['country'] ?? null,
-            'region' => $geo['regionName'] ?? null,
-            'city' => $geo['city'] ?? null,
-            'zip' => $geo['zip'] ?? null,
-            'lat' => $geo['lat'] ?? null,
-            'lon' => $geo['lon'] ?? null,
-            'isp' => $geo['isp'] ?? null,
-            'asn' => $geo['as'] ?? null,
-            'user_agent' => $userAgent,
-            'url' => $request->fullUrl(),
-            'time' => now()->toDateTimeString(),
-        ]);
-
-        return response()->json(['status' => 'logged']);
-    }
+    return response()->json([
+        'status' => true,
+        'data' => $result
+    ]);
+}
 }

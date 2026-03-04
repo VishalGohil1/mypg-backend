@@ -5,6 +5,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\API\AuthController;
 use App\Http\Controllers\API\MemberController;
 use App\Http\Controllers\API\PaymentController;
+use App\Http\Controllers\API\RentPaymentController;
 use App\Http\Controllers\API\DashboardController;
 use App\Http\Controllers\API\PartnerController;
 
@@ -43,7 +44,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('/partners/{id}', [PartnerController::class, 'destroy']);
     Route::delete('/members/{id}', [MemberController::class, 'destroy']);
 
-    Route::post('/members/{member}/collect-payment', [MemberController::class, 'collectPayment']);
+    // Route::post('/members/{member}/collect-payment', [MemberController::class, 'collectPayment']);
+    Route::get('/rent-payments/monthly-status', [RentPaymentController::class, 'getMonthlyStatus']);
+    Route::post('/rent-payments/collect', [RentPaymentController::class, 'collect']);
+    Route::get('/rent-payments/pending-members', [MemberController::class, 'pendingPayments']);
+
     
 });
 Route::post('/create-order', [PaymentController::class, 'createOrder']);

@@ -57,6 +57,8 @@ class PartnerController extends Controller
             'last_name'  => 'required',
             'email'      => 'required|email|unique:users,email',
             'password'   => 'required|min:6',
+            'city'       => 'nullable', 
+            'phone'       => 'nullable', 
         ]);
 
         $owner = auth()->user();
@@ -81,6 +83,8 @@ class PartnerController extends Controller
                 'email'      => $request->email,
                 'password'   => Hash::make($request->password),
                 'account_status' => 'active',
+                'city'      => $request->city,
+                'phone'      => $request->phone,
             ]);
 
             // Attach to PG group
