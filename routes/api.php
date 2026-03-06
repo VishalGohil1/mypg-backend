@@ -7,7 +7,9 @@ use App\Http\Controllers\API\MemberController;
 use App\Http\Controllers\API\PaymentController;
 use App\Http\Controllers\API\RentPaymentController;
 use App\Http\Controllers\API\DashboardController;
+use App\Http\Controllers\API\NoticeController;
 use App\Http\Controllers\API\PartnerController;
+use App\Http\Controllers\Api\SystemSettingsController;
 
 /*
 |--------------------------------------------------------------------------
@@ -49,7 +51,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/rent-payments/collect', [RentPaymentController::class, 'collect']);
     Route::get('/rent-payments/pending-members', [MemberController::class, 'pendingPayments']);
 
+    Route::get('/system-settings', [SystemSettingsController::class, 'show']);
+    Route::post('/system-settings', [SystemSettingsController::class, 'update']);  
     
+    Route::get('/notice-templates', [NoticeController::class,'index']);
+
+    Route::post('/notice-templates', [NoticeController::class,'store']);  
 });
 Route::post('/create-order', [PaymentController::class, 'createOrder']);
 Route::post('/verify-payment', [PaymentController::class, 'verifyPayment']);

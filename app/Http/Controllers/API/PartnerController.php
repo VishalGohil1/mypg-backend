@@ -53,12 +53,13 @@ class PartnerController extends Controller
     public function store(Request $request)
     {
         $request->validate([
-            'first_name' => 'required',
-            'last_name'  => 'required',
-            'email'      => 'required|email|unique:users,email',
-            'password'   => 'required|min:6',
-            'city'       => 'nullable', 
-            'phone'       => 'nullable', 
+            'first_name'    => 'required',
+            'last_name'     => 'required',
+            'email'         => 'required|email|unique:users,email',
+            'password'      => 'required|min:6',
+            'city'          => 'nullable',
+            'phone'         => 'nullable',
+            'profile_image' => 'nullable|image|mimes:jpg,jpeg,png|max:2048',
         ]);
 
         $owner = auth()->user();
@@ -75,16 +76,24 @@ class PartnerController extends Controller
         DB::beginTransaction();
 
         try {
+            // Handle profile image upload
+            $profileImagePath = null;
+            if ($request->hasFile('profile_image')) {
+                $profileImagePath = $request->file('profile_image')
+                    ->store('profile_images', 'public');
+            }
 
             // Create partner user
             $partner = User::create([
-                'first_name' => $request->first_name,
-                'last_name'  => $request->last_name,
-                'email'      => $request->email,
-                'password'   => Hash::make($request->password),
+                'first_name'    => $request->first_name,
+                'last_name'     => $request->last_name,
+                'email'         => $request->email,
+                'password'      => Hash::make($request->password),
                 'account_status' => 'active',
-                'city'      => $request->city,
-                'phone'      => $request->phone,
+                'city'          => $request->city,
+                'phone'         => $request->phone,
+                'profile_image' => $profileImagePath,
+                'pg_group_id'   => $group->id,
             ]);
 
             // Attach to PG group
@@ -99,11 +108,8 @@ class PartnerController extends Controller
             return response()->json([
                 'message' => 'Partner created successfully'
             ]);
-
         } catch (\Exception $e) {
-
             DB::rollBack();
-
             return response()->json([
                 'message' => 'Something went wrong',
                 'error'   => $e->getMessage()

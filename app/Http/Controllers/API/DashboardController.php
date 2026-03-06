@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use App\Models\Member;
+use App\Models\PgGroup;
 use App\Models\PGGroupUser;
 use App\Models\RentPayment;
 
@@ -16,19 +17,20 @@ class DashboardController extends Controller
         $user = Auth::user();
 
         $groupUser = PGGroupUser::where('user_id', $user->id)->first();
-
         if (!$groupUser) {
             return response()->json(['message' => 'User not linked to any PG group'], 403);
         }
-
+        
         $pgGroupId = $groupUser->pg_group_id;
-
+        
         // 1. Total Active Members
         $totalMembers = Member::where('pg_group_id', $pgGroupId)
-            ->where('is_active', 1)->count();
-
+        ->where('is_active', 1)->count();
+        
         // 2. Available Beds (static for now)
-        $availableBeds = 10;
+        $totalBeds =  PgGroup::whereId($pgGroupId)->first()->available_beds;
+        // dd($totalBeds);
+        $availableBeds = $totalBeds - $totalMembers;
 
         // 3. Monthly Revenue (current month paid)
         $monthlyRevenue = RentPayment::where('pg_group_id', $pgGroupId)

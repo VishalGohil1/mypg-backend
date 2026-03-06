@@ -9,7 +9,9 @@ class PgGroup extends Model
 {
         protected $fillable = [
             'name',
-            'owner_id'
+            'owner_id',
+            'hostel_name',
+            'available_beds',
         ];
 
     use HasFactory;

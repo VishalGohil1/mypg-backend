@@ -73,23 +73,22 @@ class AuthController extends Controller
             
         ]);
     }
-    public function register(Request $request)
+   public function register(Request $request)
     {
         $validator = Validator::make($request->all(), [
-
-            'pg_name' => 'required|string|max:255',
-            'first_name' => 'required|string|max:255',
-            'last_name' => 'required|string|max:255',
-            'email' => 'required|email|unique:users',
-            'phone' => 'required|string|max:20',
-            'city' => 'required|string|max:100',
-            'password' => 'required|min:6',
-
+            'pg_name'       => 'required|string|max:255',
+            'first_name'    => 'required|string|max:255',
+            'last_name'     => 'required|string|max:255',
+            'email'         => 'required|email|unique:users',
+            'phone'         => 'required|string|max:20',
+            'city'          => 'required|string|max:100',
+            'password'      => 'required|min:6',
+            'profile_image' => 'nullable|image|mimes:jpg,jpeg,png|max:2048',
         ]);
 
         if ($validator->fails()) {
             return response()->json([
-                'status' => false,
+                'status'  => false,
                 'message' => $validator->errors()
             ], 422);
         }
@@ -97,51 +96,57 @@ class AuthController extends Controller
         DB::beginTransaction();
 
         try {
+            // Handle profile image upload
+            $profileImagePath = null;
+            if ($request->hasFile('profile_image')) {
+                $profileImagePath = $request->file('profile_image')
+                    ->store('profile_images', 'public');
+            }
 
             // 1. Create User
             $user = User::create([
-                'name' => $request->first_name . ' ' . $request->last_name,
-                'first_name' => $request->first_name,
-                'last_name' => $request->last_name,
-                'email' => $request->email,
-                'phone' => $request->phone,
-                'city' => $request->city,
-                'password' => Hash::make($request->password),
+                'name'          => $request->first_name . ' ' . $request->last_name,
+                'first_name'    => $request->first_name,
+                'last_name'     => $request->last_name,
+                'email'         => $request->email,
+                'phone'         => $request->phone,
+                'city'          => $request->city,
+                'password'      => Hash::make($request->password),
+                'profile_image' => $profileImagePath,
             ]);
 
             // 2. Create PG Group
             $pgGroup = PgGroup::create([
-                'name' => $request->pg_name,
+                'name'     => $request->pg_name,
                 'owner_id' => $user->id,
             ]);
+
             $user->pg_group_id = $pgGroup->id;
             $user->save();
 
             // 3. Assign user as owner in pg_group_users
             DB::table('pg_group_users')->insert([
                 'pg_group_id' => $pgGroup->id,
-                'user_id' => $user->id,
-                'role' => 'owner',
-                'created_at' => now(),
-                'updated_at' => now(),
+                'user_id'     => $user->id,
+                'role'        => 'owner',
+                'created_at'  => now(),
+                'updated_at'  => now(),
             ]);
 
             DB::commit();
 
-           return response()->json([
-                'status' => true,
+            return response()->json([
+                'status'  => true,
                 'message' => 'Registration successful. Please complete payment.',
                 'user_id' => $user->id
             ]);
 
         } catch (\Exception $e) {
-
             DB::rollBack();
-
             return response()->json([
-                'status' => false,
+                'status'  => false,
                 'message' => 'Registration failed',
-                'error' => $e->getMessage()
+                'error'   => $e->getMessage()
             ]);
         }
     }
