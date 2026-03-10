@@ -85,6 +85,7 @@ class DashboardController extends Controller
             'yearly_revenue'       => $yearlyRevenue,
             'new_members_month'    => $newMembersThisMonth,
             'revenue_trend'        => $trend,
+            'total_beds'            => $totalBeds,
         ]);
     }
 }

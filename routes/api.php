@@ -9,7 +9,7 @@ use App\Http\Controllers\API\RentPaymentController;
 use App\Http\Controllers\API\DashboardController;
 use App\Http\Controllers\API\NoticeController;
 use App\Http\Controllers\API\PartnerController;
-use App\Http\Controllers\Api\SystemSettingsController;
+use App\Http\Controllers\API\SystemSettingsController;
 
 /*
 |--------------------------------------------------------------------------
