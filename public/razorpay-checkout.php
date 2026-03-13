@@ -93,26 +93,32 @@
                 prefill:     {},
                 theme:       { color: '#4f8ef7' },
                 modal: {
-                    // Allow backdrop click to close
                     backdropclose: true,
                     ondismiss: function () {
-                        postToApp({ dismissed: true });
+                        window.location.href = '/payment-redirect.php?status=cancelled';
                     }
                 },
+
                 handler: function (response) {
-                    response.user_id = user_id;
-                    postToApp(response);
-                }
+                    var p = new URLSearchParams({
+                        razorpay_payment_id: response.razorpay_payment_id,
+                        razorpay_order_id:   response.razorpay_order_id,
+                        razorpay_signature:  response.razorpay_signature,
+                        user_id:             user_id,
+                        status:              'success'
+                    });
+                    // Go to PHP page — NOT directly to mypg://
+                    window.location.href = '/payment-redirect.php?' + p.toString();
+                },
             };
 
             var rzp = new Razorpay(options);
 
             rzp.on('payment.failed', function (response) {
-                postToApp({
-                    failed: true,
-                    error: response.error.description || 'Payment failed'
-                });
+                window.location.href = '/payment-redirect.php?status=cancelled';
             });
+
+
 
             // Small delay so the page fully renders before popup opens
             // This prevents the iOS touch system from being in a bad state

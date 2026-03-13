@@ -2,6 +2,8 @@
 
 use App\Http\Controllers\API\MemberController;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\ContactController;  // 👈 add this
+
 
 /*
 |--------------------------------------------------------------------------
@@ -19,3 +21,4 @@ Route::get('/', function () {
 });
 
 Route::get('/payment',[MemberController::class,'payment']);
+Route::post('/contact', [ContactController::class, 'store']);  // 👈 add this
