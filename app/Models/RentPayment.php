@@ -12,15 +12,19 @@ class RentPayment extends Model
     protected $fillable = [
         'member_id',
         'pg_group_id',
-        'billing_year',   // ← was missing
-        'billing_month',  // ← was missing
+        'billing_year',
+        'billing_month',
         'amount',
         'payment_date',
         'payment_month',
         'collected_by',
         'status',
         'remark',
+        'payment_mode',
+        'upi_amount',
+        'cash_amount',   // ← add these 3
     ];
+
 
     public function member()
     {
@@ -40,5 +44,4 @@ class RentPayment extends Model
     {
         return $this->belongsTo(User::class, 'collected_by');
     }
-
 }

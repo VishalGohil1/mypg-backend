@@ -50,6 +50,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/rent-payments/monthly-status', [RentPaymentController::class, 'getMonthlyStatus']);
     Route::post('/rent-payments/collect', [RentPaymentController::class, 'collect']);
     Route::get('/rent-payments/pending-members', [MemberController::class, 'pendingPayments']);
+    Route::post('/rent-payments/collect-all', [MemberController::class, 'collectAllPending']);
 
     Route::get('/system-settings', [SystemSettingsController::class, 'show']);
     Route::post('/system-settings', [SystemSettingsController::class, 'update']);  

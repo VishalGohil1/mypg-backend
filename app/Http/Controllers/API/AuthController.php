@@ -76,16 +76,16 @@ class AuthController extends Controller
    public function register(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'pg_name'       => 'required|string|max:255',
-            'first_name'    => 'required|string|max:255',
-            'last_name'     => 'required|string|max:255',
-            'email'         => 'required|email|unique:users',
-            'phone'         => 'required|string|max:20',
-            'city'          => 'required|string|max:100',
-            'password'      => 'required|min:6',
-            'profile_image' => 'nullable|image|mimes:jpg,jpeg,png|max:2048',
+            'pg_name'        => 'required|string|max:255',
+            'first_name'     => 'required|string|max:255',
+            'last_name'      => 'required|string|max:255',
+            'email'          => 'required|email|unique:users',
+            'phone'          => 'required|string|max:20',
+            'city'           => 'required|string|max:100',
+            'password'       => 'required|min:6',
+            'profile_image'  => 'required|image|mimes:jpg,jpeg,png|max:2048', // ← required now
+            'available_beds' => 'required|integer|min:1',                      // ← NEW
         ]);
-
         if ($validator->fails()) {
             return response()->json([
                 'status'  => false,
@@ -117,8 +117,10 @@ class AuthController extends Controller
 
             // 2. Create PG Group
             $pgGroup = PgGroup::create([
-                'name'     => $request->pg_name,
-                'owner_id' => $user->id,
+                'name'           => $request->pg_name,
+                'hostel_name'           => $request->pg_name,
+                'owner_id'       => $user->id,
+                'available_beds' => $request->available_beds,  // ← NEW
             ]);
 
             $user->pg_group_id = $pgGroup->id;

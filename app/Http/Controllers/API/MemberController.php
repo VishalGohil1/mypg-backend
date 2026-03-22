@@ -11,6 +11,7 @@ use App\Imports\MembersImport;
 use App\Models\RentPayment;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Maatwebsite\Excel\Facades\Excel;
 
 
@@ -230,62 +231,152 @@ class MemberController extends Controller
 
         $members = Member::where('pg_group_id', $pgGroupId)
             ->where('is_active', 1)
-        ->get();
+            ->get();
 
-    $current = Carbon::now()->startOfMonth();
+        $current = Carbon::now()->startOfMonth();
 
-    $result = [];
+        $result = [];
 
-    foreach ($members as $member) {
+        foreach ($members as $member) {
 
-        if (!$member->created_at) continue;
+            if (!$member->created_at) continue;
 
-        $start = Carbon::parse($member->created_at)->startOfMonth();
+            $start = Carbon::parse($member->created_at)->startOfMonth();
 
-        $pendingMonths = 0;
+            $pendingMonths = 0;
 
-        while ($start <= $current) {
+            while ($start <= $current) {
 
-            $paid = RentPayment::where([
-                'member_id' => $member->id,
-                'pg_group_id' => $pgGroupId,
-                'billing_year' => $start->year,
-                'billing_month' => $start->month,
-                'status' => 'paid'
-            ])->exists();
+                $paid = RentPayment::where('member_id', $member->id)
+                    ->where('pg_group_id', $pgGroupId)
+                    ->where('billing_year', $start->year)
+                    ->where('billing_month', $start->month)
+                    ->whereIn('status', ['paid', 'partial'])  // ← partial = not fully pending
+                    ->exists();
 
-            if (!$paid) {
-                $pendingMonths++;
+                if (!$paid) {
+                    $pendingMonths++;
+                }
+
+                $start->addMonth();
             }
 
-            $start->addMonth();
+            if ($pendingMonths > 0) {
+
+                $currentMonthPaid = RentPayment::where('member_id', $member->id)
+                    ->where('pg_group_id', $pgGroupId)
+                    ->where('billing_year', $current->year)
+                    ->where('billing_month', $current->month)
+                    ->whereIn('status', ['paid', 'partial'])   // ← same here
+                    ->exists();
+                
+
+                $result[] = [
+                    'member_id'           => $member->id,
+                    'first_name'          => $member->first_name,
+                    'last_name'           => $member->last_name,
+                    'phone'               => $member->phone,
+                    'pending_months'      => $pendingMonths,
+                    'current_month_pending' => !$currentMonthPaid,  // <-- add this
+                ];
+            }
         }
 
-        if ($pendingMonths > 0) {
+        return response()->json([
+            'status' => true,
+            'data' => $result
+        ]);
+    }
+    public function collectAllPending(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'member_id' => 'required|integer|exists:members,id',
+        ]);
 
-              $currentMonthPaid = RentPayment::where([
-                'member_id' => $member->id,
-                'pg_group_id' => $pgGroupId,
-                'billing_year' => $current->year,
-                'billing_month' => $current->month,
-                'status' => 'paid'
-            ])->exists();
+        if ($validator->fails()) {
+            return response()->json([
+                'status'  => false,
+                'message' => $validator->errors()
+            ], 422);
+        }
 
-            $result[] = [
-                'member_id'           => $member->id,
-                'first_name'          => $member->first_name,
-                'last_name'           => $member->last_name,
-                'phone'               => $member->phone,
-                'pending_months'      => $pendingMonths,
-                'current_month_pending' => !$currentMonthPaid,  // <-- add this
-            ];
+        $user      = auth()->user();
+        $groupUser = PGGroupUser::where('user_id', $user->id)->first();
 
+        if (!$groupUser) {
+            return response()->json([
+                'status'  => false,
+                'message' => 'User not linked to any PG group'
+            ], 403);
+        }
+
+        $pgGroupId = $groupUser->pg_group_id;
+        $member    = Member::where('id', $request->member_id)
+            ->where('pg_group_id', $pgGroupId)
+            ->first();
+
+        if (!$member) {
+            return response()->json([
+                'status'  => false,
+                'message' => 'Member not found'
+            ], 404);
+        }
+
+        $current = Carbon::now()->startOfMonth();
+        $start   = Carbon::parse($member->created_at)->startOfMonth();
+        $marked  = 0;
+
+        DB::beginTransaction();
+        try {
+            while ($start <= $current) {
+                $exists = RentPayment::where([
+                    'member_id'     => $member->id,
+                    'pg_group_id'   => $pgGroupId,
+                    'billing_year'  => $start->year,
+                    'billing_month' => $start->month,
+                ])->first();
+
+                if (!$exists) {
+                    // No record at all — create as paid
+                    RentPayment::create([
+                        'member_id'     => $member->id,
+                        'pg_group_id'   => $pgGroupId,
+                        'billing_year'  => $start->year,
+                        'billing_month' => $start->month,
+                        'amount'        => $member->rent_amount,
+                        'payment_date'  => Carbon::now()->toDateString(),
+                        'payment_month' => $start->format('F Y'),
+                        'collected_by'  => $user->id,
+                        'status'        => 'paid',
+                    ]);
+                    $marked++;
+                } elseif (in_array($exists->status, ['pending', 'partial'])) {
+                    // Existing pending record — update to paid
+                    $exists->update([
+                        'status'       => 'paid',
+                        'payment_date' => Carbon::now()->toDateString(),
+                        'collected_by' => $user->id,
+                    ]);
+                    $marked++;
+                }
+
+                $start->addMonth();
+            }
+
+            DB::commit();
+
+            return response()->json([
+                'status'  => true,
+                'message' => "{$marked} month(s) marked as paid successfully.",
+                'marked'  => $marked,
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json([
+                'status'  => false,
+                'message' => 'Failed to collect payment',
+                'error'   => $e->getMessage()
+            ], 500);
         }
     }
-
-    return response()->json([
-        'status' => true,
-        'data' => $result
-    ]);
-}
 }
