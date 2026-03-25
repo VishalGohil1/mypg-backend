@@ -1,0 +1,171 @@
+<?php
+
+namespace App\Http\Controllers\API;
+
+use App\Http\Controllers\Controller;
+use App\Models\PgGroup;
+use Illuminate\Http\Request;
+use App\Models\PGGroupUser;
+use App\Models\User;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
+
+class PartnerController extends Controller
+{
+    public function index(Request $request)
+    {
+        $user = Auth::user();
+
+        // Get PG group mapping
+        $groupUser = PGGroupUser::where('user_id', $user->id)->first();
+
+        if (!$groupUser) {
+            return response()->json([
+                'message' => 'User not linked to any PG group'
+            ], 403);
+        }
+
+        // // Only owner can view partner list
+        // if ($groupUser->role !== 'owner') {
+        //     return response()->json([
+        //         'message' => 'Only owner can view partners'
+        //     ], 403);
+        // }
+
+        $pgGroupId = $groupUser->pg_group_id;
+
+        // Get all partner user IDs from mapping table
+        $partnerIds = PGGroupUser::where('pg_group_id', $pgGroupId)
+            // ->where('role', 'partner')
+            ->pluck('user_id');
+
+        // Fetch partner details
+        $partners = User::whereIn('id', $partnerIds)
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        return response()->json([
+            'status' => true,
+            'data' => $partners
+        ]);
+    }
+    public function store(Request $request)
+    {
+        $request->validate([
+            'first_name'    => 'required',
+            'last_name'     => 'required',
+            'email'         => 'required|email|unique:users,email',
+            'password'      => 'required|min:6',
+            'city'          => 'nullable',
+            'phone'         => 'nullable',
+            'profile_image' => 'nullable|image|mimes:jpg,jpeg,png|max:2048',
+        ]);
+
+        $owner = auth()->user();
+
+        // Check if logged in user is owner of a PG
+        $group = PgGroup::where('owner_id', $owner->id)->first();
+
+        if (!$group) {
+            return response()->json([
+                'message' => 'Only owner can add partner'
+            ], 403);
+        }
+
+        DB::beginTransaction();
+
+        try {
+            // Handle profile image upload
+            $profileImagePath = null;
+            if ($request->hasFile('profile_image')) {
+                $profileImagePath = $request->file('profile_image')
+                    ->store('profile_images', 'public');
+            }
+
+            // Create partner user
+            $partner = User::create([
+                'first_name'    => $request->first_name,
+                'last_name'     => $request->last_name,
+                'email'         => $request->email,
+                'password'      => Hash::make($request->password),
+                'account_status' => 'active',
+                'city'          => $request->city,
+                'phone'         => $request->phone,
+                'profile_image' => $profileImagePath,
+                'pg_group_id'   => $group->id,
+            ]);
+
+            // Attach to PG group
+            PGGroupUser::create([
+                'pg_group_id' => $group->id,
+                'user_id'     => $partner->id,
+                'role'        => 'partner'
+            ]);
+
+            DB::commit();
+
+            return response()->json([
+                'message' => 'Partner created successfully'
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json([
+                'message' => 'Something went wrong',
+                'error'   => $e->getMessage()
+            ], 500);
+        }
+    }
+    public function destroy($id)
+    {
+        $authUser = auth()->user();
+
+        // Get logged-in user's group mapping
+        $groupUser = PGGroupUser::where('user_id', $authUser->id)->first();
+
+        if (!$groupUser || $groupUser->role !== 'owner') {
+            return response()->json([
+                'message' => 'Only owner can delete partners'
+            ], 403);
+        }
+
+        // Prevent deleting self
+        if ($authUser->id == $id) {
+            return response()->json([
+                'message' => 'You cannot delete yourself'
+            ], 400);
+        }
+
+        // Check if target user exists
+        $partner = User::find($id);
+
+        if (!$partner) {
+            return response()->json([
+                'message' => 'User not found'
+            ], 404);
+        }
+
+        // Check if target user is partner in same group
+        $partnerMapping = PGGroupUser::where('user_id', $id)
+            ->where('pg_group_id', $groupUser->pg_group_id)
+            ->where('role', 'partner')
+            ->first();
+
+        if (!$partnerMapping) {
+            return response()->json([
+                'message' => 'This user is not your partner'
+            ], 403);
+        }
+
+        // Delete mapping first
+        $partnerMapping->delete();
+
+        // Delete user
+        $partner->delete();
+
+        return response()->json([
+            'status' => true,
+            'message' => 'Partner deleted successfully'
+        ]);
+    }
+}
