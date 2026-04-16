@@ -5,6 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MyPG – Property Management Simplified</title>
+    <link rel="icon" type="image/png" href="{{ asset('favicon.png') }}?v=2">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link
@@ -1307,6 +1308,7 @@
                         <li><a href="#product">Product</a></li>
                         <li><a href="#about">About Us</a></li>
                         <li><a href="#contact">Contact</a></li>
+                        <li><a href="/privacy-policy">Privacy Policy</a></li>
                     </ul>
                 </div>
                 <div class="footer-col">
@@ -1320,7 +1322,7 @@
                 </div>
             </div>
             <div class="footer-bottom">
-                <p>© 2026 MyPG. All rights reserved. Built with ❤️ for PG owners in India.</p>
+                <p>© 2026 MyPG. All rights reserved. Built with ❤️ for PG owners in India. &nbsp;·&nbsp; <a href="/privacy-policy" style="color:rgba(255,255,255,0.55);text-decoration:none;transition:color .2s;" onmouseover="this.style.color='white'" onmouseout="this.style.color='rgba(255,255,255,0.55)'">Privacy Policy</a></p>
                 <div class="social-links">
                     <!-- LinkedIn -->
                     <a href="#" class="social-link" title="Connect on LinkedIn">

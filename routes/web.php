@@ -20,5 +20,9 @@ Route::get('/', function () {
     return view('welcome');
 });
 
+Route::get('/privacy-policy', function () {
+    return view('privacy-policy');
+});
+
 Route::get('/payment',[MemberController::class,'payment']);
 Route::post('/contact', [ContactController::class, 'store']);  // 👈 add this
