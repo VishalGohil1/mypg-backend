@@ -83,7 +83,7 @@ class AuthController extends Controller
             'phone'          => 'required|string|max:20',
             'city'           => 'required|string|max:100',
             'password'       => 'required|min:6',
-            'profile_image'  => 'required|image|mimes:jpg,jpeg,png|max:2048', // ← required now
+            'profile_image'  => 'required|image|mimes:jpg,jpeg,png|max:10000', // ← required now
             'available_beds' => 'required|integer|min:1',                      // ← NEW
         ]);
         if ($validator->fails()) {
